@@ -1,7 +1,7 @@
 #!/bin/bash
 
-myV="4.9a"
-gccVersToUse="4.7.2" # failsafe check
+declare -r myV="4.9a"
+declare -r gccVersToUse="4.7.2" # failsafe check
 
 # Reset locales (important when grepping strings from output commands)
 export LC_ALL=C
@@ -12,14 +12,34 @@ declare -r CMD=$([[ $0 == /* ]] && echo "$0" || echo "${PWD}/${0#./}")
 # Retrieve full path of CloverGrower
 declare -r CLOVER_GROWER_SCRIPT=$(readlink "$CMD" || echo "$CMD")
 declare -r CLOVER_GROWER_DIR=${CLOVER_GROWER_SCRIPT%/*}
+declare -r CLOVER_GROWER_CONF="$CLOVER_GROWER_DIR/CloverGrower.conf"
 
 # Source librarie
 source "$CLOVER_GROWER_DIR/CloverGrower.lib"
+
+# Source config file
+[[ ! -f "$CLOVER_GROWER_CONF" ]] && touch "$CLOVER_GROWER_CONF"
+source "$CLOVER_GROWER_CONF"
 
 target="64"
 if [ "$1" == "" ]; then
 	target="X64/IA32"
 fi
+
+function checkConfig() {
+    if [[ -z "$TOOLCHAIN" ]];then
+        echo "Where to put the toolchain directory ?"
+        TOOLCHAIN=$(prompt "TOOCHAIN directory" "$CLOVER_GROWER_DIR/toolchain")
+        storeConfig 'TOOLCHAIN' "$TOOLCHAIN"
+    fi
+    if [[ -z "$EDK2DIR" ]];then
+        echo "Where to put the edk2 source files ?"
+        EDK2DIR=$(prompt "edk2 directory" "$CLOVER_GROWER_DIR/edk2")
+        storeConfig 'EDK2DIR' "$EDK2DIR"
+    fi
+}
+
+checkConfig
 
 # don't use -e
 set -u
@@ -27,36 +47,9 @@ set -u
 theBoss=$(id -ur)
 hours=$(get_hours)
 
-if [ ! -f /usr/bin/gcc ]; then
-	echob "ERROR:"
-	echob "      Xcode Command Line Tools from Apple"
-	echob "      Not found!"
-	echob "      CloverGrower.command needs it";echo
-	echob "      Going To Apple Developer Site"
-	echob "      Download & Install XCode Command Line Tools then re-run CloverGrower.command"
-	open "https://developer.apple.com/downloads/"
-	wait
-	echob "Good $hours"
-	tput bel
-	exit 1
-fi
-
-if [[ ! -L "/usr/local/bin/clover" || $(readlink "/usr/local/bin/clover") != "$CLOVER_GROWER_SCRIPT" ]]; then
-	echob "Running CloverGrower.command"
-	printf "Will create link %s to %s\n" $(echob "/usr/local/bin/clover") $(echob "CloverGrower.command")
-	echob "You can THEN 'run' CloverGrower.command by typing 'clover' ;)"
-	read -p "Press 'c' to 'CREATE' the link or else to 'quit': " theKey
-	[[ $(lc "$theKey") != "c" ]] && echob "Ok, Bye" && exit
-	if [ ! -d /usr/local/bin ]; then
-		command="sudo mkdir -p /usr/local/bin"; echob "$command" ; eval $command
-	fi	
-	command="sudo ln -sf $CLOVER_GROWER_SCRIPT /usr/local/bin/clover && sudo chown $theBoss /usr/local/bin/clover"
-	echob "$command" ; eval $command
-fi
-
 #vars
 export WORKDIR="$CLOVER_GROWER_DIR"
-export TOOLCHAIN="${CLOVER_GROWER_DIR}/toolchain"
+export TOOLCHAIN="${TOOLCHAIN}"
 workSpace=$(df -m "${WORKDIR}" | tail -n1 | awk '{ print $4 }')
 workSpaceNeeded="522"
 workSpaceMin="104"
@@ -64,11 +57,10 @@ filesDIR="${WORKDIR}"/Files
 UserDIR="${WORKDIR}"/User/etc
 etcDIR="${WORKDIR}"/Files/etc
 srcDIR="${WORKDIR}"/src
-edk2DIR="${WORKDIR}"/src/edk2
-CloverDIR="${WORKDIR}"/src/edk2/Clover
-rEFItDIR="${WORKDIR}"/src/edk2/Clover/rEFIt_UEFI
-buildDIR="${WORKDIR}"/src/edk2/Build
-cloverPKGDIR="${WORKDIR}"/src/edk2/Clover/CloverPackage
+CloverDIR="${EDK2DIR}"/Clover
+rEFItDIR="${CloverDIR}"/rEFIt_UEFI
+buildDIR="${EDK2DIR}"/Build
+cloverPKGDIR="${CloverDIR}"/CloverPackage
 builtPKGDIR="${WORKDIR}"/builtPKG
 theBuiltVersion=""
 
@@ -78,12 +70,9 @@ buildClover=0
 flagTime="No" # flag for complete download/build time, GCC, edk2, Clover, pkg
 [[ ! -d "${builtPKGDIR}" ]] && mkdir "${builtPKGDIR}"
 
-# Check for svn
-[[ -z $(type -P svn) ]] && { echob "svn command not found. Exiting..." >&2 ; exit 1; }
-
 style=release
 
-if [[ ! -d "$edk2DIR" && "$workSpace" -lt "$workSpaceNeeded" ]]; then
+if [[ ! -d "$EDK2DIR" && "$workSpace" -lt "$workSpaceNeeded" ]]; then
 	echob "error!!! Not enough free space"
 	echob "Need at least $workSpaceNeeded bytes free"
 	echob "Only have $workSpace bytes"
@@ -107,6 +96,57 @@ case "${theSystem}" in
     [13-20]) sysmess="Unknown" ;;
 esac
 
+function checkCloverLink() {
+    if [[ ! -L "/usr/local/bin/clover" || $(readlink "/usr/local/bin/clover") != "$CLOVER_GROWER_SCRIPT" ]]; then
+        echob "Running CloverGrower.command"
+        printf "Will create link %s to %s\n" $(echob "/usr/local/bin/clover") $(echob "CloverGrower.command")
+        echob "You can THEN 'run' CloverGrower.command by typing 'clover' ;)"
+        echob "Press Enter to continue"
+        read
+        if [ ! -d /usr/local/bin ]; then
+            command="sudo mkdir -p /usr/local/bin"; echob "$command" ; eval $command
+        fi
+        command="sudo ln -sf $CLOVER_GROWER_SCRIPT /usr/local/bin/clover && sudo chown $theBoss /usr/local/bin/clover"
+        echob "$command" ; eval $command
+    fi
+}
+
+# Check XCode command line tools
+function checkXCode() {
+    if [[ ! -x /usr/bin/gcc ]]; then
+        echob "ERROR:"
+        echob "      Xcode Command Line Tools from Apple not found!"
+        echob "      CloverGrower.command needs it";echo
+        echob "      Going To Apple Developer Site"
+        echob "      Download & Install XCode Command Line Tools then re-run CloverGrower.command"
+        echo
+        echob "      Press enter to open a browser to download XCode Command Line Tools"
+        read
+        open "https://developer.apple.com/downloads/"
+        wait
+        echob "Good $hours"
+        tput bel
+        exit 1
+    fi
+}
+
+# Check Toolchain
+function checkToolchain() {
+    [[ -z "$TOOLCHAIN" ]] && echob "variable TOOLCHAIN not defined !" && exit 1
+    if [[ ! -x "${TOOLCHAIN}/bin/x86_64-linux-gnu-gcc" ]]; then
+        installToolchain
+    fi
+}
+
+# Check the build environment
+function checkEnv() {
+    checkCloverLink
+    checkXCode
+    # Check for svn
+    [[ -z $(type -P svn) ]] && { echob "svn command not found. Exiting..." >&2 ; exit 1; }
+    checkToolchain
+}
+
 # set up Revisions
 function getREVISIONSClover(){
     # Clover
@@ -123,38 +163,41 @@ function getREVISIONSClover(){
 function getREVISIONSedk2(){
 	# EDK2
 	export edk2REV=$(getSvnRevision http://edk2.svn.sourceforge.net/svnroot/edk2)
-    getSvnRevision "$edk2DIR" > "${edk2DIR}"/Lvers.txt # update edk2 local revision
+    getSvnRevision "$EDK2DIR" > "${EDK2DIR}"/Lvers.txt # update edk2 local revision
 }
 
 # checkout/update svn
-# $1=Local folder, $2=svn Remote folder
+# $1=name $2=Local folder, $2=svn Remote url
 # return code:
 #     0: no update found
 #     1: update found
 function getSOURCEFILE() {
-    if [ ! -d "$1" ]; then
+    local name="$1"
+    local localdir="$2"
+    local svnremoteurl="$3"
+    if [ ! -d "$localdir" ]; then
         echob "    ERROR:"
-        echo  "        Local $1 Folder Not Found.."
-        echob "        Making Local ${1} Folder..."
-        mkdir "$1"
-        echob "    Checking out Remote $1 revision "$(getSvnRevision "$2")
-        echo  "    svn co $2"
-        svn co "$2" "$1"
-        getREVISIONS${1} Initial # flag to write initial revision
+        echo  "        Local $localdir folder not found.."
+        echob "        Making local ${localdir} folder..."
+        mkdir "$localdir"
+        echob "    Checking out Remote $name revision "$(getSvnRevision "$svnremoteurl")
+        echo  "    svn co $svnremoteurl"
+        (cd "$localdir" && svn co "$svnremoteurl" "$localdir")
+        getREVISIONS${name} Initial # flag to write initial revision
         return 1
     fi
 
-    local localRev=$(getSvnRevision "$1")
-    local remoteRev=$(getSvnRevision "$2")
+    local localRev=$(getSvnRevision "$localdir")
+    local remoteRev=$(getSvnRevision "$svnremoteurl")
     if [[ "${localRev}" == "${remoteRev}" ]]; then
-        echob "    Checked $1 SVN, 'No updates were found...'"
+        echob "    Checked $name SVN, 'No updates were found...'"
         return 0
     fi
-    echob "    Checked $1 SVN, 'Updates found...'"
-    echob "    Auto Updating $1 From $localRev to $remoteRev ..."
+    echob "    Checked $name SVN, 'Updates found...'"
+    echob "    Auto Updating $name From $localRev to $remoteRev ..."
     tput bel
-    (cd "$1" && svn up >/dev/null)
-    checkit "    Svn up $1" "$2"
+    (cd "$localdir" && svn up >/dev/null)
+    checkit "    Svn up $name" "$svnremoteurl"
     return 1
 }
 
@@ -164,10 +207,10 @@ function getSOURCE() {
         echob "  Make src Folder.."
         mkdir "${srcDIR}"
     fi
-    if [ ! -d "${edk2DIR}"/Build/CloverX64 ] && [ ! -d "${edk2DIR}"/Build/CloverIA32 ]; then
+    if [ ! -d "${EDK2DIR}"/Build/CloverX64 ] && [ ! -d "${EDK2DIR}"/Build/CloverIA32 ]; then
         buildMode=">CleanAll< Build  "
     fi
-    if [ -d "${edk2DIR}"/Build/CloverX64 ] || [  -d "${edk2DIR}"/Build/CloverIA32 ]; then
+    if [ -d "${EDK2DIR}"/Build/CloverX64 ] || [  -d "${EDK2DIR}"/Build/CloverIA32 ]; then
         buildMode=">>>Clean<<< Build "
     fi
 
@@ -175,21 +218,21 @@ function getSOURCE() {
     if [[ "${cloverUpdate}" == "Yes" ]]; then
         # Get edk2 source
         cd "${srcDIR}"
-        getSOURCEFILE edk2 "https://edk2.svn.sourceforge.net/svnroot/edk2/trunk/edk2"
+        getSOURCEFILE edk2 "$EDK2DIR" "https://edk2.svn.sourceforge.net/svnroot/edk2/trunk/edk2"
         local buildBaseTools=$?
 
         # Is edk2 need to be update
         if [[ "$buildBaseTools" -eq 1 ]]; then
-            cd "${edk2DIR}"
+            cd "${EDK2DIR}"
 
             # Remove old edk2 config files
-            rm -f "${edk2DIR}"/Conf/{BuildEnv.sh,build_rule.txt,target.txt,tools_def.txt}
+            rm -f "${EDK2DIR}"/Conf/{BuildEnv.sh,build_rule.txt,target.txt,tools_def.txt}
 
             # Create new default edk2 files in edk2/Conf
             ./edksetup.sh >/dev/null
 
             # Patch edk2/Conf/tools_def.txt for GCC
-            patch --quiet -d "${edk2DIR}/Conf" < ${filesDIR}/tools_def.patch
+            patch --quiet -d "${EDK2DIR}/Conf" < ${filesDIR}/tools_def.patch
             checkit "    Patching edk2/Conf/tools_def.txt"
 
             make -C BaseTools clean &>/dev/null
@@ -199,8 +242,8 @@ function getSOURCE() {
     fi
 
     # Get Clover source
-    cd "${edk2DIR}"
-    getSOURCEFILE Clover "svn://svn.code.sf.net/p/cloverefiboot/code/"
+    cd "${EDK2DIR}"
+    getSOURCEFILE Clover "$CloverDIR" "svn://svn.code.sf.net/p/cloverefiboot/code/"
     buildClover=$?
 
     # Is Clover need to be update
@@ -249,123 +292,18 @@ function cleanRUN(){
 	echob "Exiting function cleanRUN:";echo
 }
 
-# sets up 'new' sysmlinks for gcc47
-function MakeSymLinks() {
-# Function: SymLinks in CG_PREFIX location
-# Need this here to fix links if Files/.CloverTools gets removed
-    DoLinks "ia32" "i686-linux-gnu"
-    DoLinks "x64"  "x86_64-linux-gnu"
-}
-
-#makes 'new' syslinks
-function DoLinks(){
-    ARCH="$1"
-    TARGET="$2"
-    if [[ ! -d "${TOOLCHAIN}/${ARCH}" ]]; then
-        mkdir -p "${TOOLCHAIN}/${ARCH}"
-        echo "  Fixing your $gccVers Symlinks"
-        for bin in gcc ar ld objcopy; do
-            ln -sf "${CG_PREFIX}"/bin/$TARGET-$bin  "${TOOLCHAIN}/${ARCH}"/$bin
-        done
-        echo "  Finished: Fixing"
-        echo "  symlinks are in: ${TOOLCHAIN}/$ARCH"
-    fi
-}
-
-# checks for gcc install and installs if NOT found
-function checkGCC(){
-    export mygccVers="${gccVers:0:1}${gccVers:2:1}" # needed for BUILD_TOOLS e.g GCC46
-    gccDIRS="/usr/local /opt/local $WORKDIR/src/CloverTools" # user has 3 choices for gcc install
-    echob "Entering function checkGCC:"
-    echo "  Checking gcc $gccVers INSTALL status"
-    for theDIRS in $gccDIRS; do # check install dirs for gcc
-        CG_PREFIX="${theDIRS}" #else
-        echo "  Checking ${theDIRS}"
-        if [ -x "${CG_PREFIX}"/bin/x86_64-linux-gnu-gcc ]; then
-            local lVers=$("${CG_PREFIX}/bin/x86_64-linux-gnu-gcc" -dumpversion)
-            export mygccVers="${lVers:0:1}${lVers:2:1}" # needed for BUILD_TOOLS e.g GCC46
-            echo "  gcc $lVers detected in ${theDIRS}"
-            read -p "  Do you want to use it [y/n] " choose
-            case "$choose" in
-                n|N)
-                     CG_PREFIX=""
-                     break
-                     ;;
-                y|Y)
-                     echo "  Fixing gcc…"
-                     MakeSymLinks
-                     echo "${lVers}" > "${filesDIR}"/.gccVersion
-                     return
-                     ;;
-                *)
-                   echob "  Good $hours"
-                   exit 1
-            esac
-        else
-            sleep 1
-            echob "  ...Not Found"
-        fi
-    done
-    installGCC
-}
-
-function installGCC(){
-echob "  CloverTools using gcc $gccVers NOT installed"
-echo ""
-echo "  Enter 'o' to PERMANENTLY install CloverTools to working directory"
-echob "            /opt/local (RECOMMENDED)"
-echo "  Enter 't' to install CloverTools to working directory" 
-echob "            $WORKDIR/src/CloverTools"
-echo "  Enter 'p' to PERMANENTLY install CloverTools to working directory"
-echob "            /usr/local"
-echo "  Hit 'return' to EXIT"
-echo "  Type letter and hit <RETURN>: "
-sudoIT="sudo" # install to /opt OR /usr need sudo
-read choose
-case $choose in
-	t|T)
-	CG_PREFIX="${WORKDIR}"/src/CloverTools
-	sudoIT="sh" # if install to above NO need to sudo ( well hopefully)
-	;;
-	o|O)
-	CG_PREFIX="/opt/local"
-	;;
-	p|P)
-	CG_PREFIX="/usr/local"
-	;;
-	*)
-	echob "	 Good $hours"
-	exit 1
-	esac
-if [ "$sudoIT" == "sudo" ];then
-	echob "  Need Admin Privileges for ${CG_PREFIX}"
-	[ ! -d "${CG_PREFIX}"/src ] && "$sudoIT" mkdir -p "${CG_PREFIX}"/src && "$sudoIT" chown -R 0:0 "${CG_PREFIX}"
-else
-	[ ! -d "${CG_PREFIX}"/src ] && mkdir -p "${CG_PREFIX}"/src
-fi		
-cd "${WORKDIR}"/Files
-echo "  Download and install CloverGrower gcc Compile Tools"
-echob "  To: ${CG_PREFIX}"
-echo "  Press any key to start the process..."
-read
-echo "  $sudoIT Files/buildgcc -all ${CG_PREFIX} $gccVers"
-echob "  Starting CloverGrower Compile Tools process..." 
-STARTM=$(date -u "+%s")
-date
-"$sudoIT" ./buildgcc.sh -all "${CG_PREFIX}" "$gccVers" #& # build all to CG_PREFIX with gccVers
-wait
-tput bel
-cd ..
-if [ -f "${CG_PREFIX}"/ia32/gcc ] || [ -f "${CG_PREFIX}"/x64/gcc ]; then
-	echo "${CG_PREFIX}" >"${filesDIR}"/.CloverTools # if 2 above are found write into gcc config file
-	MakeSymLinks
-	flagTime="Yes"
-	return 
-elif [ ! -f "$CG_PREFIX"/ia32/gcc ] && [ ! -f "$CG_PREFIX"/x64/gcc ]; then
-	echob " Clover Compile Tools install ERROR: will re-try"
-	checkGCC
-	return
-fi
+function installToolchain() {
+    cd "${WORKDIR}"/Files
+    echo  "Download and install toolchain to compile Clover"
+    printf "toolchain will be install in %s\n" $(echob ${TOOLCHAIN})
+    echo  "Press any key to start the process..."
+    read
+    echob "Starting CloverGrower Compile Tools process..."
+    STARTM=$(date -u "+%s")
+    date
+    PREFIX="$TOOLCHAIN" DIR_MAIN="$srcDIR" DIR_TOOLS="$srcDIR/CloverTools" ./buildgcc.sh -x64 -all # build only x64 because it can compile ia32 too
+    tput bel
+    cd ..
 }
 
 # main function
@@ -373,7 +311,7 @@ function Main(){
 STARTD=$(date -j "+%d-%h-%Y")
 theARCHS="$1"
 buildMode=">>>>New<<<< Build "
-edk2Local=$(cat "${edk2DIR}"/Lvers.txt)
+edk2Local=$(cat "${EDK2DIR}"/Lvers.txt)
 echo $(date)
 cloverLocal=${cloverLocal:=''}
 echob "*******************************************"
@@ -479,7 +417,7 @@ function makePKG(){
             read
             cd ..
         fi
-        echob "Ready to build Clover $CloverREV, Using Gcc $gccVers"
+        echob "Ready to build Clover $CloverREV, Using Gcc $gccVersToUse"
         sleep 3
         autoBuild "$1"
         tput bel
@@ -502,7 +440,7 @@ function makePKG(){
 		else
 			TTIMEM=$(printf "%ds\n" $((RUNTIMEM)))
 		fi	
-		echob "Clover revision $cloverVers Compile process took $TTIMEM to complete" 
+		echob "Clover revision $cloverVers Compile process took $TTIMEM to complete"
 	fi
 	echo "$CloverREV" > "${CloverDIR}"/Lvers.txt
 	if [ "$target" == "X64/IA32" ]; then
@@ -526,16 +464,16 @@ function makePKG(){
 				fi	
 			fi	
 			cd "${CloverDIR}"/CloverPackage
-			echob "cd to src/edk2/Clover/CloverPackage and run ./makepkg."
+			echob "cd to ${CloverDIR}/CloverPackage and run ./makepkg."
 			./makepkg "No"
 			wait
 			echob "mkdir buildPKG/${versionToBuild}."
 			mkdir "${builtPKGDIR}"/"${versionToBuild}"
-			echob "cp src/edk2/Clover/CloverPackage/sym/ builtPKG/${versionToBuild}."
+			echob "cp ${CloverDIR}/CloverPackage/sym/ builtPKG/${versionToBuild}."
 			cp -R "${CloverDIR}"/CloverPackage/sym/ "${builtPKGDIR}"/"${versionToBuild}"/
-			echob "rm -rf src/edk2/Clover/CloverPackage/sym."
+			echob "rm -rf ${CloverDIR}/CloverPackage/sym."
 			rm -rf "${CloverDIR}"/CloverPackage/sym
-			echob "rm -rf src/edk2/Build."
+			echob "rm -rf ${buildDIR}."
 			rm -rf "${buildDIR}"
 			echob "open builtPKG/${versionToBuild}."
 			open "${builtPKGDIR}"/"${versionToBuild}"
@@ -552,37 +490,14 @@ function makePKG(){
 	fi
 }
 
-# Check versionBuilt
-if [[ -f "${filesDIR}/.gccVersion" ]];then
-	gccVers=$(cat "${filesDIR}/.gccVersion")
-else
-	gccVers=$(curl -s http://gcc.gnu.org/index.html | sed -n 's/.*>GCC \([0-9.]*\)<.*/\1/p' | head -n1) # get latest version info ;)
-	if [[ "${gccVers}" != "${gccVersToUse}" ]]; then
-		echob "error!!"			  # may be possible that this may not work
-		echob "check GCC ${gccVers} is ACTUALLY available"
-		echob "EXPERIMENTAL!!!"
-		tput bel
-		exit
-	fi
-fi
+# Check CloverGrower build environment
+checkEnv
 
-# setup gcc
-gVers=""
-if [ -f "${filesDIR}"/.CloverTools ]; then # Path to GCC4?
-	export CG_PREFIX=$(cat "${filesDIR}"/.CloverTools) # get Path
-	if [[ -x "${CG_PREFIX}"/bin/x86_64-linux-gnu-gcc ]]; then
-		gVers=$("${CG_PREFIX}/bin/x86_64-linux-gnu-gcc" -dumpversion)
-	fi
-fi
-
-if [[ "${gVers}" == "" || ! -x "${TOOLCHAIN}"/ia32/gcc || ! -x "${TOOLCHAIN}"/x64/gcc ]];then
-    checkGCC
-    [[ -n "${CG_PREFIX}" ]] && echo "${CG_PREFIX}" >"${filesDIR}/.CloverTools"
-fi
-
-export mygccVers="${gccVers:0:1}${gccVers:2:1}" # needed for BUILD_TOOLS e.g GCC47
+export mygccVers="${gccVersToUse:0:1}${gccVersToUse:2:1}" # needed for BUILD_TOOLS e.g GCC47
 buildMess="*    Auto-Build Full Clover rEFIt_UEFI    *"
 cleanMode=""
 built="No"
+
 makePKG "$target" # do complete build
+
 echob "Good $hours."

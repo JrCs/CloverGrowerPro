@@ -3,11 +3,11 @@
 *.[oa]
 *~
 
-# Files generated automatically
-Files/.CloverTools
-Files/.gccVersion
+# Local configuration file
+CloverGrower.conf
 
 # Directories that we doesn't need to track
 builtPKG/
+edk2/
 src/
-Toolchain/
+toolchain/

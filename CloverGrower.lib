@@ -11,6 +11,24 @@ function lc() {
     echo "$1" | tr '[A-Z]' '[a-z]'
 }
 
+function prompt() {
+	read -p "$1 [$2]: " answer >&2
+	if [[ -z "$answer" && -n "$2" ]]; then
+		answer="$2"
+	fi
+	echo "$answer"
+}
+
+function storeConfig() {
+    local variable="$1"
+    local value="$2"
+    [[ -z "$CLOVER_GROWER_CONF" ]] && echob "variable CLOVER_GROWER_CONF not defined !" && exit 1
+    egrep -v "^$variable=" "$CLOVER_GROWER_CONF" > "$CLOVER_GROWER_CONF".new
+    echo "$variable='$value'" >> "$CLOVER_GROWER_CONF".new
+    cat "$CLOVER_GROWER_CONF".new | sort > "$CLOVER_GROWER_CONF" && \
+     rm "$CLOVER_GROWER_CONF".new
+}
+
 function get_hours() {
 	starth=$(date "+%k")
 	# message Afternoon is longest len so others must have same len also

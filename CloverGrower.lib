@@ -29,6 +29,22 @@ function storeConfig() {
      rm "$CLOVER_GROWER_CONF".new
 }
 
+function mountRamDisk() {
+    export RAMDISK_MNT_PT="$1"
+    dev_ramdisk=$(mount | grep "$RAMDISK_MNT_PT" | awk '{print $1}')
+    if [ -z "$dev_ramdisk" ];then
+        echo "        Creating new RAM disk"
+        dev_ramdisk=`hdiutil attach -nomount ram://409600 | awk '{print $1}'`
+        echo
+        [ -n "$dev_ramdisk" ] && newfs_hfs -v "CloverGrower RamDisk" "$dev_ramdisk" && echo
+        [ ! -d "$RAMDISK_MNT_PT" ] && mkdir "$RAMDISK_MNT_PT"
+        mount -t hfs "$dev_ramdisk" "$RAMDISK_MNT_PT"
+
+    fi
+    # Automatically remove RAMDISK on exit
+    trap 'echo; echo "Ejecting RAM disk"; cd "$CLOVER_GROWER_DIR"; umount "$RAMDISK_MNT_PT" && hdiutil detach "$dev_ramdisk"' EXIT
+}
+
 function get_hours() {
 	starth=$(date "+%k")
 	# message Afternoon is longest len so others must have same len also

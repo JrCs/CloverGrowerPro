@@ -274,19 +274,22 @@ function cleanRUN(){
 	clear
 	echo "	Starting $buildMode Process: $(date -j +%T)"
 	echo "	Building Clover$theBits: gcc${mygccVers} $style"
+
+	# Mount the RamDisk
+	mountRamDisk "$EDK2DIR/Build"
+
 	if [ "$bits" == "X64/IA32" ]; then
 		archBits='x64 ia32'
 		cd "${CloverDIR}"
 		for az in $archBits ; do
 			echob "	 running ./ebuild.sh -gcc${mygccVers} -$az -$style"
 			./ebuild.sh -gcc${mygccVers} -$az -"$style" 
-			wait
 			checkit "Clover$az $theStyle"
 		done
 		cd "${rEFItDIR}"
 		echob "	 Building rEFIt32: $builder $style $(date -j +%T)"
 		echob "	 With build32.sh"
-		./"build32.sh" 
+		./"build32.sh"
 		checkit "rEFIT_UEFI_$theBits: $theStyle" 
 	else
 		cd "${CloverDIR}"

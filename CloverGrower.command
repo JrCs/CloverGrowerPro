@@ -502,8 +502,6 @@ function makePKG(){
 			cp -R "${CloverDIR}"/CloverPackage/sym/ "${builtPKGDIR}"/"${versionToBuild}"/
 			echob "rm -rf ${CloverDIR}/CloverPackage/sym."
 			rm -rf "${CloverDIR}"/CloverPackage/sym
-			echob "rm -rf ${buildDIR}."
-			rm -rf "${buildDIR}"
 			echob "open builtPKG/${versionToBuild}."
 			open "${builtPKGDIR}"/"${versionToBuild}"
 			tput bel

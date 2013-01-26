@@ -151,6 +151,13 @@ function checkToolchain() {
     fi
 }
 
+# Check Directories
+function checkDirs() {
+	for d in $cloverPKGDIR/CloverV2/EFI/drivers64UEFI; do
+		[[ ! -d "$d" ]] && mkdir -p "$d"
+	done
+}
+
 # Check the build environment
 function checkEnv() {
     checkCloverLink
@@ -158,6 +165,7 @@ function checkEnv() {
     # Check for svn
     [[ -z $(type -P svn) ]] && { echob "svn command not found. Exiting..." >&2 ; exit 1; }
     checkToolchain
+    checkDirs
 }
 
 # set up Revisions

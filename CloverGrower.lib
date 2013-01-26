@@ -82,5 +82,83 @@ function getSvnRevision() {
     # Arguments:
     #    $1: location of an svn repository (directory or URL)
 	[[ $# -ne 1 ]] && echo "getSvnRevision: invalid number of arguments" >&2 && exit 1
-    svn info "$1" | sed -n 's/^Revision: *//p'
+    local svn_revision
+    if [[ "$1" == *://* ]]; then
+        svn_revision=$(LC_ALL=C svn info "$1" | sed -n 's/^Revision: *//p')
+    else
+        svn_revision=$(cd "$1" && LC_ALL=C git svn info 2>/dev/null | sed -n 's/^Revision: *//p')
+        [[ -z "$svn_revision" ]] && svn_revision=$(LC_ALL=C svn info "$1" | sed -n 's/^Revision: *//p')
+    fi
+    echo $svn_revision
+}
+
+function checkout_git_svn_repository() {
+    local svnremoteurl="$1"
+    local lastrev=$(getSvnRevision "$svnremoteurl")
+    echo "Getting history please wait ..."
+    while read -r revision; do
+        ((percent=(100 * $revision)/$lastrev))
+        printf "\rGetting revision r%d / r%d (%d%%)" $revision $lastrev $percent
+    done < <(git svn clone "$svnremoteurl" . 2>/dev/null | sed -nl 's/^r\([0-9]*\).*/\1/p')
+    echo
+}
+
+# Function that checkout a svn repository into an svn or git-svn local repository
+function checkout_repository() {
+    local localdir="$1"
+    local svnremoteurl="$2"
+    local repotype="$3"
+    case "$repotype" in
+        svn)
+             (cd "$localdir" && svn co "$svnremoteurl" "$localdir")
+             ;;
+        git)
+             (cd "$localdir" && checkout_git_svn_repository "$svnremoteurl")
+             ;;
+        *) echo "Unknown repository type '$repotype" >&2
+           exit 1
+           ;;
+    esac
+    exit
+}
+
+function update_git_svn_repository() {
+    # Check if we have pending commits
+    local pending=$(git diff-index --name-only HEAD)
+    # Check if we have untracked files
+    #local untracked=$(git ls-files :/ --exclude-standard --others)
+    #if [[ -z "$pending" && -z "$untracked" ]];then
+    if [[ -z "$pending" ]];then
+        local lastrev=$(getSvnRevision "$svnremoteurl")
+        echo "Getting last history please wait ..."
+        while read -r revision; do
+            ((percent=(100 * $revision)/$lastrev))
+            printf "\rGetting revision r%d / r%d (%d%%)" $revision $lastrev $percent
+        done < <(git svn rebase 2>/dev/null | sed -nl 's/^r\([0-9]*\).*/\1/p')
+        echo
+    else
+        # git svn fetch --all | grep '^r'
+        echo
+        echob "Local file(s) needs update not updating local repository"
+        echob "Press any key…"
+        tput bel
+        read
+    fi
+}
+
+# Function that update an svn or git-svn local repository
+function update_repository() {
+    local localdir="$1"
+    local repotype="$2"
+    case "$repotype" in
+        svn)
+             (cd "$localdir" && svn up >/dev/null)
+             ;;
+        git)
+             (cd "$localdir" && update_git_svn_repository)
+             ;;
+        *) echo "Unknown repository type '$repotype" >&2
+           exit 1
+           ;;
+    esac
 }

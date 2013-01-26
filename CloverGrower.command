@@ -50,6 +50,15 @@ function checkConfig() {
         fi
         storeConfig 'CLOVERSVNURL' "$CLOVERSVNURL"
     fi
+	if [[ -z "$CLOVERLOCALREPO" ]];then
+		local repotype=$(prompt "Do you want svn or git local clover repository" "svn")
+		if [[ $(lc "$repotype") == g* ]];then
+			CLOVERLOCALREPO='git'
+		else
+			CLOVERLOCALREPO='svn'
+		fi
+		storeConfig 'CLOVERLOCALREPO' "$CLOVERLOCALREPO"
+	fi
 }
 
 checkConfig
@@ -196,6 +205,7 @@ function getSOURCEFILE() {
     local name="$1"
     local localdir="$2"
     local svnremoteurl="$3"
+    local repotype="${4:-svn}"
     if [ ! -d "$localdir" ]; then
         echob "    ERROR:"
         echo  "        Local $localdir folder not found.."
@@ -203,7 +213,7 @@ function getSOURCEFILE() {
         mkdir "$localdir"
         echob "    Checking out Remote $name revision "$(getSvnRevision "$svnremoteurl")
         echo  "    svn co $svnremoteurl"
-        (cd "$localdir" && svn co "$svnremoteurl" "$localdir")
+        checkout_repository "$localdir" "$svnremoteurl" "$repotype"
         getREVISIONS${name} Initial # flag to write initial revision
         return 1
     fi
@@ -217,7 +227,7 @@ function getSOURCEFILE() {
     echob "    Checked $name SVN, 'Updates found...'"
     echob "    Auto Updating $name From $localRev to $remoteRev ..."
     tput bel
-    (cd "$localdir" && svn up >/dev/null)
+    update_repository "$localdir" "$repotype"
     checkit "    Svn up $name" "$svnremoteurl"
     return 1
 }
@@ -260,7 +270,7 @@ function getSOURCE() {
 
     # Get Clover source
     cd "${EDK2DIR}"
-    getSOURCEFILE Clover "$CloverDIR" "$CLOVERSVNURL"
+    getSOURCEFILE Clover "$CloverDIR" "$CLOVERSVNURL" "$CLOVERLOCALREPO"
     buildClover=$?
 
     # Is Clover need to be update
@@ -436,16 +446,16 @@ function makePKG(){
 
     if [[ "$buildClover" -eq 1 ]]; then
         versionToBuild="${CloverREV}"
-        if [ "${cloverUpdate}" == "Yes" ]; then
-            echob "svn changes for $CloverREV"
-            cd "${CloverDIR}"
-            changesSVN=$(svn log -v -r "$CloverREV")
-            echob "$changesSVN"
-            echob "Press any key…"
-            tput bel
-            read
-            cd ..
-        fi
+        # if [ "${cloverUpdate}" == "Yes" ]; then
+        #     echob "svn changes for $CloverREV"
+        #     cd "${CloverDIR}"
+        #     changesSVN=$(svn log -v -r "$CloverREV")
+        #     echob "$changesSVN"
+        #     echob "Press any key…"
+        #     tput bel
+        #     read
+        #     cd ..
+        # fi
         echob "Ready to build Clover $CloverREV, Using Gcc $gccVersToUse"
         sleep 3
         autoBuild "$1"

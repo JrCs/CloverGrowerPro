@@ -12,7 +12,8 @@ function lc() {
 }
 
 function prompt() {
-	read -p "$1 [$2]: " answer >&2
+	local default=${2:+[$2]}
+	read -p "$1 $default: " answer >&2
 	if [[ -z "$answer" && -n "$2" ]]; then
 		answer="$2"
 	fi

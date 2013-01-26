@@ -264,6 +264,10 @@ function cleanRUN(){
     # Mount the RamDisk
     mountRamDisk "$EDK2DIR/Build"
 
+    # Patch CloverX64.dsc
+    [[ -f "$CloverDIR/CloverX64.dsc.orig" ]] && mv "$CloverDIR/CloverX64.dsc.orig" "$CloverDIR/CloverX64.dsc"
+    sed -i'.orig' -e 's/# *\(GCC:\*_\*_\*_CC_FLAGS.*-DCLOVER_VBIOS_PATCH_IN_CLOVEREFI.*\)/\1/' "$CloverDIR/CloverX64.dsc"
+
     cd "${CloverDIR}"
     local IFS=" /" # archs can be separate by space or /
     for arch in $(lc $archs); do
@@ -271,6 +275,10 @@ function cleanRUN(){
         ./ebuild.sh -gcc${mygccVers} -$arch -"$style"
         checkit "Clover$arch $style"
     done
+
+    # Restore CloverX64.dsc
+    [[ -f "$CloverDIR/CloverX64.dsc.orig" ]] && mv "$CloverDIR/CloverX64.dsc.orig" "$CloverDIR/CloverX64.dsc"
+
     echo
 }
 

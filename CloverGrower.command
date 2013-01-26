@@ -231,15 +231,6 @@ function getSOURCE() {
             # Create new default edk2 files in edk2/Conf
             ./edksetup.sh >/dev/null
 
-            # Get configuration files from Clover
-            cp "${CloverDIR}/Patches_for_EDK2/tools_def.txt"  "${EDK2DIR}/Conf/"
-            cp "${CloverDIR}/Patches_for_EDK2/build_rule.txt" "${EDK2DIR}/Conf/"
-
-            # Patch edk2/Conf/tools_def.txt for GCC
-            sed -ie 's!^\(DEFINE GCC47_[IA32X64]*_PREFIX *= *\).*!\1'${TOOLCHAIN}'/bin/x86_64-linux-gnu-!' \
-             "${EDK2DIR}/Conf/tools_def.txt"
-            checkit "    Patching edk2/Conf/tools_def.txt"
-
             make -C BaseTools clean &>/dev/null
             # Basetool will be build automatically when Clover will be build
         fi
@@ -253,6 +244,15 @@ function getSOURCE() {
 
     # Is Clover need to be update
     if [[ "$buildClover" -eq 1 ]]; then
+        # Get configuration files from Clover
+        cp "${CloverDIR}/Patches_for_EDK2/tools_def.txt"  "${EDK2DIR}/Conf/"
+        cp "${CloverDIR}/Patches_for_EDK2/build_rule.txt" "${EDK2DIR}/Conf/"
+
+        # Patch edk2/Conf/tools_def.txt for GCC
+        sed -ie 's!^\(DEFINE GCC47_[IA32X64]*_PREFIX *= *\).*!\1'${TOOLCHAIN}'/bin/x86_64-linux-gnu-!' \
+         "${EDK2DIR}/Conf/tools_def.txt"
+        checkit "    Patching edk2/Conf/tools_def.txt"
+
         echob "    Clover updated, so rm the build folder"
         rm -Rf "${buildDIR}"/*
 

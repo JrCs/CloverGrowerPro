@@ -50,7 +50,6 @@ function checkConfig() {
         fi
         storeConfig 'CLOVERSVNURL' "$CLOVERSVNURL"
     fi
-    exit
 }
 
 checkConfig

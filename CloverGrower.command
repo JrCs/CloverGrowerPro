@@ -37,6 +37,20 @@ function checkConfig() {
         EDK2DIR=$(prompt "edk2 directory" "$CLOVER_GROWER_DIR/edk2")
         storeConfig 'EDK2DIR' "$EDK2DIR"
     fi
+    if [[ -z "$CLOVERSVNURL" ]]; then
+        local developper=$(prompt "Do you have the rights to commit Clover source files" "No")
+        local login
+        if [[ $(lc "$developper") == y* ]];then
+            login=$(prompt "What is your login on sourceforge.net" "")
+        fi
+        if [[ -n "$login" ]];then
+            CLOVERSVNURL="svn+ssh://$login@svn.code.sf.net/p/cloverefiboot/code"
+        else
+            CLOVERSVNURL='svn://svn.code.sf.net/p/cloverefiboot/code'
+        fi
+        storeConfig 'CLOVERSVNURL' "$CLOVERSVNURL"
+    fi
+    exit
 }
 
 checkConfig
@@ -150,12 +164,12 @@ function checkEnv() {
 # set up Revisions
 function getREVISIONSClover(){
     # Clover
-    export CloverREV=$(getSvnRevision svn://svn.code.sf.net/p/cloverefiboot/code)
+    export CloverREV=$(getSvnRevision "$CLOVERSVNURL")
     if [ "$1" == "Initial" ]; then
         echo "${CloverREV}" > "${CloverDIR}"/Lvers.txt	# make initial revision txt file
     fi
     # rEFIt
-    export rEFItREV=$(getSvnRevision svn://svn.code.sf.net/p/cloverefiboot/code/rEFIt_UEFI)
+    export rEFItREV=$(getSvnRevision "$CLOVERSVNURL"/rEFIt_UEFI)
     export cloverVers="${CloverREV}:${rEFItREV}"
 }
 
@@ -239,7 +253,7 @@ function getSOURCE() {
 
     # Get Clover source
     cd "${EDK2DIR}"
-    getSOURCEFILE Clover "$CloverDIR" "svn://svn.code.sf.net/p/cloverefiboot/code/"
+    getSOURCEFILE Clover "$CloverDIR" "$CLOVERSVNURL"
     buildClover=$?
 
     # Is Clover need to be update

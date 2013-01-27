@@ -261,7 +261,7 @@ function getSOURCE() {
         cp "${CloverDIR}/Patches_for_EDK2/build_rule.txt" "${EDK2DIR}/Conf/"
 
         # Patch edk2/Conf/tools_def.txt for GCC
-        sed -ie 's!^\(DEFINE GCC47_[IA32X64]*_PREFIX *= *\).*!\1'${TOOLCHAIN}'/bin/x86_64-linux-gnu-!' \
+        sed -i'.orig' -e 's!^\(DEFINE GCC47_[IA32X64]*_PREFIX *= *\).*!\1'${TOOLCHAIN}'/bin/x86_64-linux-gnu-!' \
          "${EDK2DIR}/Conf/tools_def.txt"
         checkit "    Patching edk2/Conf/tools_def.txt"
 

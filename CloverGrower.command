@@ -21,7 +21,7 @@ source "$CLOVER_GROWER_DIR/CloverGrower.lib"
 [[ ! -f "$CLOVER_GROWER_CONF" ]] && touch "$CLOVER_GROWER_CONF"
 source "$CLOVER_GROWER_CONF"
 
-target="64"
+target="X64"
 if [ "$1" == "" ]; then
 	target="X64/IA32"
 fi
@@ -89,20 +89,19 @@ theBuiltVersion=""
 # Some Flags
 buildClover=0
 
-flagTime="No" # flag for complete download/build time, GCC, edk2, Clover, pkg
 [[ ! -d "${builtPKGDIR}" ]] && mkdir "${builtPKGDIR}"
 
 style=release
 
 if [[ ! -d "$EDK2DIR" && "$workSpace" -lt "$workSpaceNeeded" ]]; then
-	echob "error!!! Not enough free space"
-	echob "Need at least $workSpaceNeeded bytes free"
-	echob "Only have $workSpace bytes"
-	echob "move CloverGrower to different Folder"
-	echob "OR free some space"
-	exit 1
+    echob "error!!! Not enough free space"
+    echob "Need at least $workSpaceNeeded bytes free"
+    echob "Only have $workSpace bytes"
+    echob "move CloverGrower to different Folder"
+    echob "OR free some space"
+    exit 1
 elif [[ "$workSpace" -lt "$workSpaceMin" ]]; then
-	echob "Getting low on free space"
+    echob "Getting low on free space"
 fi
 workSpaceAvail="$workSpace"
 
@@ -114,7 +113,7 @@ case "${theSystem}" in
     9) rootSystem="Leopard" ;;
     10) rootSystem="Snow Leopard" ;;
     11) rootSystem="Lion" ;;
-    12)	rootSystem="Mountain Lion" ;;
+    12) rootSystem="Mountain Lion" ;;
     [13-20]) sysmess="Unknown" ;;
 esac
 
@@ -162,9 +161,11 @@ function checkToolchain() {
 
 # Check Directories
 function checkDirs() {
-	for d in $cloverPKGDIR/CloverV2/EFI/drivers64UEFI; do
-		[[ ! -d "$d" ]] && mkdir -p "$d"
-	done
+    for d in $cloverPKGDIR/CloverV2/EFI/drivers32 \
+             $cloverPKGDIR/CloverV2/EFI/drivers64 \
+             $cloverPKGDIR/CloverV2/EFI/drivers64UEFI ; do \
+        [[ ! -d "$d" ]] && mkdir -p "$d"
+    done
 }
 
 # Check the build environment
@@ -175,25 +176,6 @@ function checkEnv() {
     [[ -z $(type -P svn) ]] && { echob "svn command not found. Exiting..." >&2 ; exit 1; }
     checkToolchain
     checkDirs
-}
-
-# set up Revisions
-function getREVISIONSClover(){
-    # Clover
-    export CloverREV=$(getSvnRevision "$CLOVERSVNURL")
-    if [ "$1" == "Initial" ]; then
-        echo "${CloverREV}" > "${CloverDIR}"/Lvers.txt	# make initial revision txt file
-    fi
-    # rEFIt
-    export rEFItREV=$(getSvnRevision "$CLOVERSVNURL"/rEFIt_UEFI)
-    export cloverVers="${CloverREV}:${rEFItREV}"
-}
-
-# set up Revisions
-function getREVISIONSedk2(){
-	# EDK2
-	export edk2REV=$(getSvnRevision http://edk2.svn.sourceforge.net/svnroot/edk2)
-    getSvnRevision "$EDK2DIR" > "${EDK2DIR}"/Lvers.txt # update edk2 local revision
 }
 
 # checkout/update svn
@@ -214,7 +196,6 @@ function getSOURCEFILE() {
         echob "    Checking out Remote $name revision "$(getSvnRevision "$svnremoteurl")
         echo  "    svn co $svnremoteurl"
         checkout_repository "$localdir" "$svnremoteurl" "$repotype"
-        getREVISIONS${name} Initial # flag to write initial revision
         return 1
     fi
 
@@ -296,39 +277,34 @@ function getSOURCE() {
 
 # compiles X64 or IA32 versions of Clover and rEFIt_UEFI
 function cleanRUN(){
-	echob "Entering function cleanRUN:"
-	builder=gcc
-	bits=$1
-	theBits=$(echo "$bits" | awk '{print toupper($0)}')
-	theBuilder=$(echo "$builder" | awk '{print toupper($0)}')
-	theStyle=$(echo "$style" | awk '{print toupper($0)}')
-	clear
-	echo "	Starting $buildMode Process: $(date -j +%T)"
-	echo "	Building Clover$theBits: gcc${mygccVers} $style"
+    local builder=gcc
+    local archs=$(echo "$1" | awk '{print toupper($0)}')
+    echo
+    echo "Starting $buildMode Process: $(date -j +%T)"
+    echo "Building Clover$archs, gcc${mygccVers} $style"
 
-	# Mount the RamDisk
-	mountRamDisk "$EDK2DIR/Build"
+    # Mount the RamDisk
+    mountRamDisk "$EDK2DIR/Build"
 
-	if [ "$bits" == "X64/IA32" ]; then
-		archBits='x64 ia32'
-		cd "${CloverDIR}"
-		for az in $archBits ; do
-			echob "	 running ./ebuild.sh -gcc${mygccVers} -$az -$style"
-			./ebuild.sh -gcc${mygccVers} -$az -"$style" 
-			checkit "Clover$az $theStyle"
-		done
-		cd "${rEFItDIR}"
-		echob "	 Building rEFIt32: $builder $style $(date -j +%T)"
-		echob "	 With build32.sh"
-		./"build32.sh"
-		checkit "rEFIT_UEFI_$theBits: $theStyle" 
-	else
-		cd "${CloverDIR}"
-		echob "	 running ./ebuild.sh -gcc${mygccVers} -X64 -$style"
-		./ebuild.sh -gcc${mygccVers} -x64 -"$style" 
-		checkit "CloverX64 $theStyle"
-	fi
-	echob "Exiting function cleanRUN:";echo
+    if [ "$archs" == "X64/IA32" ]; then
+        cd "${CloverDIR}"
+        for arch in x64 ia32; do
+            echob "running ./ebuild.sh -gcc${mygccVers} -$arch -$style"
+            ./ebuild.sh -gcc${mygccVers} -$arch -"$style"
+            checkit "Clover$arch $style"
+        done
+        cd "${rEFItDIR}"
+        echob "Building rEFIt32: $builder $style $(date -j +%T)"
+        echob "With build32.sh"
+        ./"build32.sh"
+        checkit "rEFIT_UEFI_$archs: $style"
+    else
+        cd "${CloverDIR}"
+        echob "running ./ebuild.sh -gcc${mygccVers} -x64 -$style"
+        ./ebuild.sh -gcc${mygccVers} -x64 -"$style"
+        checkit "CloverX64 $style"
+    fi
+    echo
 }
 
 function installToolchain() {
@@ -338,102 +314,106 @@ function installToolchain() {
     echo  "Press any key to start the process..."
     read
     echob "Starting CloverGrower Compile Tools process..."
-    STARTM=$(date -u "+%s")
     date
     PREFIX="$TOOLCHAIN" DIR_MAIN="$srcDIR" DIR_TOOLS="$srcDIR/CloverTools" ./buildgcc.sh -x64 -all # build only x64 because it can compile ia32 too
     tput bel
     cd ..
 }
 
-# main function
-function Main(){
-STARTD=$(date -j "+%d-%h-%Y")
-theARCHS="$1"
-buildMode=">>>>New<<<< Build "
-edk2Local=$(cat "${EDK2DIR}"/Lvers.txt)
-echo $(date)
-cloverLocal=${cloverLocal:=''}
-echob "*******************************************"
-echob "$buildMess"
-echob "*    Revisions:- edk2: $edk2Local              *"
-echob "*              Clover: $cloverVers            *"
-echob "*    Using Flags: gcc$mygccVers ${targetBitsMess} $style  *"
-echob "*******************************************"
-STARTT=$(date -j "+%H:%M")
-STARTM=$(date -u "+%s")
-cleanRUN "$theARCHS"
-}
 
 autoBuild(){
-	
-	if [ "$built" == "No" ]; then
-		buildMess="*    Auto-Build Full Clover rEFIt_UEFI    *"
-		cleanMode=""
-		targetBits="$1"
-		targetBitsMess="${targetBits}"
-		Main "${targetBits}"
-		built="Yes"
-	fi	
-}	
+    local theARCHS="$1"
+    if [ "$built" == "No" ]; then
+        local buildMess="*    Auto-Build Full Clover rEFIt_UEFI    *"
+        local cleanMode=""
+        buildMode=">>>>New<<<< Build "
+        local edk2LocalRev=$(getSvnRevision "$EDK2DIR")
+        echob "*******************************************"
+        echob "$buildMess"
+        echob "$(printf '*    Revisions:  edk2: %-19s*\n' $edk2LocalRev)"
+        echob "$(printf '*              Clover: %-19s*\n' $versionToBuild)"
+        local IFS=
+        local flags="$mygccVers $theARCHS $style"
+        echob "$(printf '*    Using Flags: gcc%-21s*\n' $flags)"
+        echob "*******************************************"
+        tput bel
+        sleep 3
+        local startEpoch=$(date -u "+%s")
+        cleanRUN "$theARCHS"
+        built="Yes"
+        local stopEpoch=$(date -u "+%s")
+
+        local buildTime=$(expr $stopEpoch - $startEpoch)
+        local timeToBuild
+        if [[ $buildTime -gt 59 ]]; then
+            timeToBuild=$(printf "%dm%ds\n" $((buildTime/60%60)) $((buildTime%60)))
+        else
+            timeToBuild=$(printf "%ds\n" $((buildTime)))
+        fi
+        echob "Clover Grower Complete Build process took $timeToBuild to complete..."
+    fi
+}
 
 # makes pkg if Built OR builds THEN makes pkg
 function makePKG(){
-	versionToBuild=""
-	cloverUpdate="No"
-	clear;echo
-	echob "********************************************"
-	echob "*             Good $hours               *"
-	echob "*      Welcome To CloverGrower V$myV       *"
-	echob "*        This script by STLVNUB            *"
-	echob "* Clover Credits: Slice, dmazar and others *"
-	echob "********************************************";echo
-	echob "running '$(basename $CMD)' on '$rootSystem'";echo
-	echob "Work Folder: $WORKDIR"
-	echob "Available  : ${workSpaceAvail} MB"
-	getREVISIONSClover "test" # get Clover SVN revision, returns in CloverREV, "test" is dummy flag, does NOT write revision in folder
-	versionToBuild="${CloverREV}" # Clover not checked out so use it.
-	if [ -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ] && [ -d "${CloverDIR}" ] && [ "$target" != "64" ]; then # don't build IF pkg already here
-		if [ -f "${builtPKGDIR}/${versionToBuild}"/CloverCD/EFI/BOOT/BOOTX64.efi ]; then
-			theBuiltVersion=$(strings "${builtPKGDIR}/${versionToBuild}/CloverCD/EFI/BOOT/BOOTX64.efi" | sed -n 's/^Clover revision: *//p')
-			if [ "${theBuiltVersion}" == "${versionToBuild}" ]; then
-				built="Yes"
-			else
-				built="No "
-				cloverUpdate="Yes"
-			fi
-			echob "*********Clover Package STATS***********"
-			echob "*       remote revision at ${CloverREV}        *" 
-			echob "*       local  revision at ${versionToBuild}        *"
-			echob "*       Package Built   =  $built         *"
-			echob "****************************************"
-			if [ "$built" == "Yes" ]; then
-				echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made!!"
-				return
-			fi	
-		fi
-	fi	
-
+    versionToBuild=""
+    cloverUpdate="No"
+    clear;echo
+    echob "********************************************"
+    echob "*             Good $hours               *"
+    echob "*      Welcome To CloverGrower V$myV       *"
+    echob "*        This script by STLVNUB            *"
+    echob "* Clover Credits: Slice, dmazar and others *"
+    echob "********************************************"
     echo
-	if [[ ! -d "${CloverDIR}" ]]; then
-		cloverUpdate="Yes"
-	else
-		cloverLVers=$(getSvnRevision "${CloverDIR}")
-		if [[ "${cloverLVers}" != "${CloverREV}" ]]; then
-            echob "Clover Update Detected !"
-            cloverUpdate="Yes"
-            versionToBuild="${CloverREV}"
-			echob "*********Clover Package STATS***********"
-			echob "*       local  revision at ${cloverLVers}         *"
-			echob "*       remote revision at ${CloverREV}         *"
-			echob "*       Package Built   =  $built         *"
-			echob "****************************************"
-        else
-            echob "No Clover Update found. Current revision: ${cloverLVers}"
+    echob "running '$(basename $CMD)' on '$rootSystem'"
+    echo
+    echob "Work Folder: $WORKDIR"
+    echob "Available  : ${workSpaceAvail} MB"
+    local cloverRemoteRev=$(getSvnRevision "$CLOVERSVNURL")
+    versionToBuild=$cloverRemoteRev
+    if [ -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ] && [ -d "${CloverDIR}" ] && [ "$target" != "X64" ]; then # don't build IF pkg already here
+        if [ -f "${builtPKGDIR}/${versionToBuild}"/CloverCD/EFI/BOOT/BOOTX64.efi ]; then
+            theBuiltVersion=$(strings "${builtPKGDIR}/${versionToBuild}/CloverCD/EFI/BOOT/BOOTX64.efi" | sed -n 's/^Clover revision: *//p')
+            if [ "${theBuiltVersion}" == "${versionToBuild}" ]; then
+                built="Yes"
+            else
+                built="No "
+                cloverUpdate="Yes"
+            fi
+            local cloverLocalRev=$(getSvnRevision "${CloverDIR}")
+            echob  "******** Clover Package STATS **********"
+            echob "$(printf '*       local  revision at %-12s*\n' $cloverLocalRev)"
+            echob "$(printf '*       remote revision at %-12s*\n' $cloverRemoteRev)"
+            echob "$(printf '*       Package Built   =  %-12s*\n' $built)"
+            echob "****************************************"
+            if [ "$built" == "Yes" ]; then
+                echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made!!"
+                return
+            fi
         fi
     fi
 
     echo
-	if [[ "${cloverUpdate}" == "Yes" ]]; then
+    if [[ ! -d "${CloverDIR}" ]]; then
+        cloverUpdate="Yes"
+    else
+        local cloverLocalRev=$(getSvnRevision "${CloverDIR}")
+        if [[ "${cloverLocalRev}" != "${versionToBuild}" ]]; then
+            echob "Clover Update Detected !"
+            cloverUpdate="Yes"
+            echob  "******** Clover Package STATS **********"
+            echob "$(printf '*       local  revision at %-12s*\n' $cloverLocalRev)"
+            echob "$(printf '*       remote revision at %-12s*\n' $cloverRemoteRev)"
+            echob "$(printf '*       Package Built   =  %-12s*\n' $built)"
+            echob "****************************************"
+        else
+            echob "No Clover Update found. Current revision: ${cloverLocalRev}"
+        fi
+    fi
+
+    echo
+    if [[ "${cloverUpdate}" == "Yes" ]]; then
         echob "Getting SVN Source, Hang ten…"
         getSOURCE
     fi
@@ -441,47 +421,15 @@ function makePKG(){
     # If not already built force Clover build
     if [[ "$built" == "No" ]]; then
         echob "No build already done. Forcing Clover build"
+        echo
         buildClover=1
     fi
 
     if [[ "$buildClover" -eq 1 ]]; then
-        versionToBuild="${CloverREV}"
-        # if [ "${cloverUpdate}" == "Yes" ]; then
-        #     echob "svn changes for $CloverREV"
-        #     cd "${CloverDIR}"
-        #     changesSVN=$(svn log -v -r "$CloverREV")
-        #     echob "$changesSVN"
-        #     echob "Press any key…"
-        #     tput bel
-        #     read
-        #     cd ..
-        # fi
-        echob "Ready to build Clover $CloverREV, Using Gcc $gccVersToUse"
-        sleep 3
+        echob "Ready to build Clover $versionToBuild, Using Gcc $gccVersToUse"
         autoBuild "$1"
-        tput bel
     fi
 
-	if [ "$flagTime" == "Yes" ]; then
-		STOPBM=$(date -u "+%s")
-		RUNTIMEMB=$(expr $STOPBM - $STARTM)
-		if (($RUNTIMEMB>59)); then
-			TTIMEMB=$(printf "%dm%ds\n" $((RUNTIMEMB/60%60)) $((RUNTIMEMB%60)))
-		else
-			TTIMEMB=$(printf "%ds\n" $((RUNTIMEMB)))
-		fi
-		echob "Clover	Grower Complete Build process took $TTIMEMB to complete..."
-	else
-		STOPM=$(date -u "+%s")
-		RUNTIMEM=$(expr $STOPM - $STARTM)
-		if (($RUNTIMEM>59)); then
-			TTIMEM=$(printf "%dm%ds\n" $((RUNTIMEM/60%60)) $((RUNTIMEM%60)))
-		else
-			TTIMEM=$(printf "%ds\n" $((RUNTIMEM)))
-		fi	
-		echob "Clover revision $cloverVers Compile process took $TTIMEM to complete"
-	fi
-	echo "$CloverREV" > "${CloverDIR}"/Lvers.txt
 	if [ "$target" == "X64/IA32" ]; then
 		if [ ! -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ]; then # make pkg if not there
 			echob "Type 'm' To make Clover_v2_rL${versionToBuild}.pkg..."
@@ -522,8 +470,8 @@ function makePKG(){
 			echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made !"
 		fi
 	else
-		echob "Skipping pkg creation, 64bit Build Only"
-		open "${buildDIR}"/Clover/${theStyle}_GCC${mygccVers}
+        echob "Skipping pkg creation, 64bit Build Only"
+        open "${cloverPKGDIR}"/CloverV2/
 	fi
 }
 

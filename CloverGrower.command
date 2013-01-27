@@ -362,7 +362,7 @@ function makePKG(){
     echob "********************************************"
     echob "*             Good $hours               *"
     echob "*      Welcome To CloverGrower V$myV       *"
-    echob "*        This script by STLVNUB            *"
+    echob "*       This script by STLVNUB/JrCs        *"
     echob "* Clover Credits: Slice, dmazar and others *"
     echob "********************************************"
     echo

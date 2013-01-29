@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -r myV="4.9a"
+declare -r CloverGrowerVersion="5.0"
 declare -r gccVersToUse="4.7.2" # failsafe check
 
 # Reset locales (important when grepping strings from output commands)
@@ -328,9 +328,10 @@ function makePKG(){
     cloverUpdate="No"
     clear;echo
     echob "********************************************"
-    echob "*             Good $hours               *"
-    echob "*      Welcome To CloverGrower V$myV       *"
-    echob "*       This script by STLVNUB/JrCs        *"
+    echob "*              Good $hours              *"
+    echob "*     Welcome To CloverGrowerPro v$CloverGrowerVersion      *"
+    echob "*           This script by JrCs            *"
+    echob "*        Original script by STLVNUB        *"
     echob "* Clover Credits: Slice, dmazar and others *"
     echob "********************************************"
     echo

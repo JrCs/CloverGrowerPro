@@ -8,7 +8,7 @@ function echob() {
 
 # Convert argument to lowercase
 function lc() {
-    echo "$1" | tr '[A-Z]' '[a-z]'
+    echo "$@" | tr '[A-Z]' '[a-z]'
 }
 
 function prompt() {

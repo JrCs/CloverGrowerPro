@@ -161,10 +161,8 @@ function checkToolchain() {
 
 # Check Directories
 function checkDirs() {
-    for d in $cloverPKGDIR/CloverV2/EFI/drivers32 \
-             $cloverPKGDIR/CloverV2/EFI/drivers64 \
-             $cloverPKGDIR/CloverV2/EFI/drivers64UEFI ; do \
-        [[ ! -d "$d" ]] && mkdir -p "$d"
+    for d in $cloverPKGDIR/CloverV2/EFI/drivers64UEFI ; do \
+     [[ ! -d "$d" ]] && mkdir -p "$d"
     done
 }
 

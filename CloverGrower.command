@@ -21,10 +21,8 @@ source "$CLOVER_GROWER_DIR/CloverGrower.lib"
 [[ ! -f "$CLOVER_GROWER_CONF" ]] && touch "$CLOVER_GROWER_CONF"
 source "$CLOVER_GROWER_CONF"
 
-target="X64"
-if [ "$1" == "" ]; then
-	target="X64/IA32"
-fi
+target="X64/IA32"
+[[ -n "$1" ]] && target="X64"
 
 function checkConfig() {
     if [[ -z "$TOOLCHAIN" ]];then
@@ -266,24 +264,13 @@ function cleanRUN(){
     # Mount the RamDisk
     mountRamDisk "$EDK2DIR/Build"
 
-    if [ "$archs" == "X64/IA32" ]; then
-        cd "${CloverDIR}"
-        for arch in x64 ia32; do
-            echob "running ./ebuild.sh -gcc${mygccVers} -$arch -$style"
-            ./ebuild.sh -gcc${mygccVers} -$arch -"$style"
-            checkit "Clover$arch $style"
-        done
-        cd "${rEFItDIR}"
-        echob "Building rEFIt32: $builder $style $(date -j +%T)"
-        echob "With build32.sh"
-        ./"build32.sh"
-        checkit "rEFIT_UEFI_$archs: $style"
-    else
-        cd "${CloverDIR}"
-        echob "running ./ebuild.sh -gcc${mygccVers} -x64 -$style"
-        ./ebuild.sh -gcc${mygccVers} -x64 -"$style"
-        checkit "CloverX64 $style"
-    fi
+    cd "${CloverDIR}"
+    local IFS=" /" # archs can be separate by space or /
+    for arch in $(lc $archs); do
+        echob "running ./ebuild.sh -gcc${mygccVers} -$arch -$style"
+        ./ebuild.sh -gcc${mygccVers} -$arch -"$style"
+        checkit "Clover$arch $style"
+    done
     echo
 }
 
@@ -331,6 +318,7 @@ autoBuild(){
             timeToBuild=$(printf "%ds\n" $((buildTime)))
         fi
         echob "Clover Grower Complete Build process took $timeToBuild to complete..."
+        echo
     fi
 }
 

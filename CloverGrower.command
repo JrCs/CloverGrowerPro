@@ -21,8 +21,8 @@ source "$CLOVER_GROWER_DIR/CloverGrower.lib"
 [[ ! -f "$CLOVER_GROWER_CONF" ]] && touch "$CLOVER_GROWER_CONF"
 source "$CLOVER_GROWER_CONF"
 
-target="X64/IA32"
-[[ -n "$1" ]] && target="X64"
+target="X64"
+[[ -n "$1" ]] && target="X64/IA32"
 
 function checkConfig() {
     if [[ -z "$TOOLCHAIN" ]];then

@@ -24,6 +24,8 @@ source "$CLOVER_GROWER_CONF"
 target="X64"
 [[ -n "$1" ]] && target="X64/IA32"
 
+MAKE_PACKAGE=1
+
 function checkConfig() {
     if [[ -z "$TOOLCHAIN" ]];then
         echo "Where to put the toolchain directory ?"
@@ -416,7 +418,7 @@ function makePKG(){
         autoBuild "$1"
     fi
 
-	if [ "$target" == "X64/IA32" ]; then
+	if [ "$MAKE_PACKAGE" -eq 1 ]; then
 		if [ ! -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ]; then # make pkg if not there
 			echob "Type 'm' To make Clover_v2_rL${versionToBuild}.pkg..."
 			read choose
@@ -456,7 +458,7 @@ function makePKG(){
 			echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made !"
 		fi
 	else
-        echob "Skipping pkg creation, 64bit Build Only"
+        echob "Skipping pkg creation,"
         open "${cloverPKGDIR}"/CloverV2/
 	fi
 }

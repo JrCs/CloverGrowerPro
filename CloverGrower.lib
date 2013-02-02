@@ -87,7 +87,7 @@ function getSvnRevision() {
         svn_revision=$(LC_ALL=C svn info "$1" | sed -n 's/^Revision: *//p')
     else
         svn_revision=$(cd "$1" && LC_ALL=C git svn info 2>/dev/null | sed -n 's/^Revision: *//p')
-        [[ -z "$svn_revision" ]] && svn_revision=$(LC_ALL=C svn info "$1" | sed -n 's/^Revision: *//p')
+        [[ -z "$svn_revision" ]] && svn_revision=$(LC_ALL=C svn info "$1" 2>/dev/null | sed -n 's/^Revision: *//p')
     fi
     echo $svn_revision
 }
@@ -119,7 +119,6 @@ function checkout_repository() {
            exit 1
            ;;
     esac
-    exit
 }
 
 function update_git_svn_repository() {
@@ -153,7 +152,7 @@ function update_repository() {
     local repotype="$2"
     case "$repotype" in
         svn)
-             (cd "$localdir" && svn up >/dev/null)
+             (cd "$localdir" && svn up --parents >/dev/null)
              ;;
         git)
              (cd "$localdir" && update_git_svn_repository)

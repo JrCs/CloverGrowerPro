@@ -189,11 +189,13 @@ function getSOURCEFILE() {
     local svnremoteurl="$3"
     local repotype="${4:-svn}"
     local remoteRev=$(getSvnRevision "$svnremoteurl")
-    if [ ! -d "$localdir" ]; then
+    if [[ ! -d "$localdir" ]]; then
         echob "    ERROR:"
         echo  "        Local $localdir folder not found.."
         echob "        Making local ${localdir} folder..."
         mkdir "$localdir"
+    fi
+    if [[ ! -d "${localdir}/.svn" && ! -d "${localdir}/.git" ]]; then
         echob "    Checking out Remote $name revision $remoteRev"
         echo  "    svn co $svnremoteurl"
         checkout_repository "$localdir" "$svnremoteurl" "$repotype"

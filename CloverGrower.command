@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -r myV="4.9a"
+declare -r CloverGrowerVersion="5.0"
 declare -r gccVersToUse="4.7.2" # failsafe check
 
 # Reset locales (important when grepping strings from output commands)
@@ -21,10 +21,30 @@ source "$CLOVER_GROWER_DIR/CloverGrower.lib"
 [[ ! -f "$CLOVER_GROWER_CONF" ]] && touch "$CLOVER_GROWER_CONF"
 source "$CLOVER_GROWER_CONF"
 
-target="X64/IA32"
-[[ -n "$1" ]] && target="X64"
+target="X64"
+[[ -n "$1" ]] && target="X64/IA32"
+
+MAKE_PACKAGE=1
+CLOVER_REMOTE_REV=
+CLOVER_LOCAL_REV=
 
 function checkConfig() {
+    if [[ -z "$CHECKUPDATEINTERVAL" ]];then
+        local updateInterval
+        local msg=$(printf "Check for CloverGrowerPro update every %say/%seek/%sonth/%sever" \
+                    $(echob "D") $(echob "W") $(echob "M") $(echob "N"))
+        while [[ -z "$CHECKUPDATEINTERVAL" ]]; do
+            CHECKUPDATEINTERVAL=$(prompt "$msg" "W")
+            case "$CHECKUPDATEINTERVAL" in
+                [Nn]) CHECKUPDATEINTERVAL=-1       ;;
+                [Dd]) CHECKUPDATEINTERVAL=86400    ;;
+                [Ww]) CHECKUPDATEINTERVAL=604800   ;;
+                [Mm]) CHECKUPDATEINTERVAL=18446400 ;;
+                *)    CHECKUPDATEINTERVAL= ;;
+            esac
+        done
+        storeConfig 'CHECKUPDATEINTERVAL' "$CHECKUPDATEINTERVAL"
+    fi
     if [[ -z "$TOOLCHAIN" ]];then
         echo "Where to put the toolchain directory ?"
         TOOLCHAIN=$(prompt "TOOCHAIN directory" "$CLOVER_GROWER_DIR/toolchain")
@@ -48,18 +68,30 @@ function checkConfig() {
         fi
         storeConfig 'CLOVERSVNURL' "$CLOVERSVNURL"
     fi
-	if [[ -z "$CLOVERLOCALREPO" ]];then
-		local repotype=$(prompt "Do you want svn or git local clover repository" "svn")
-		if [[ $(lc "$repotype") == g* ]];then
-			CLOVERLOCALREPO='git'
-		else
-			CLOVERLOCALREPO='svn'
-		fi
-		storeConfig 'CLOVERLOCALREPO' "$CLOVERLOCALREPO"
-	fi
+    if [[ -z "$CLOVERLOCALREPO" ]];then
+        local repotype=$(prompt "Do you want svn or git local clover repository" "svn")
+        if [[ $(lc "$repotype") == g* ]];then
+            CLOVERLOCALREPO='git'
+        else
+            CLOVERLOCALREPO='svn'
+        fi
+        storeConfig 'CLOVERLOCALREPO' "$CLOVERLOCALREPO"
+    fi
+}
+
+function checkUpdate() {
+    local check_timestamp_file="$CLOVER_GROWER_DIR/.last_check"
+    local last_check=$(cat "$check_timestamp_file" 2>/dev/null)
+    local now=$(date '+%s')
+    if [[ $(( ${last_check:-0} + $CHECKUPDATEINTERVAL )) -lt $now ]]; then
+        echo "Checking for new version of CloverGrowerPro..."
+        git pull -f || exit 1
+        echo "$now" > "$check_timestamp_file"
+    fi
 }
 
 checkConfig
+checkUpdate
 
 # don't use -e
 set -u
@@ -184,19 +216,21 @@ function getSOURCEFILE() {
     local localdir="$2"
     local svnremoteurl="$3"
     local repotype="${4:-svn}"
-    if [ ! -d "$localdir" ]; then
+    local remoteRev=$(getSvnRevision "$svnremoteurl")
+    if [[ ! -d "$localdir" ]]; then
         echob "    ERROR:"
         echo  "        Local $localdir folder not found.."
         echob "        Making local ${localdir} folder..."
         mkdir "$localdir"
-        echob "    Checking out Remote $name revision "$(getSvnRevision "$svnremoteurl")
+    fi
+    if [[ ! -d "${localdir}/.svn" && ! -d "${localdir}/.git" ]]; then
+        echob "    Checking out Remote $name revision $remoteRev"
         echo  "    svn co $svnremoteurl"
         checkout_repository "$localdir" "$svnremoteurl" "$repotype"
         return 1
     fi
 
     local localRev=$(getSvnRevision "$localdir")
-    local remoteRev=$(getSvnRevision "$svnremoteurl")
     if [[ "${localRev}" == "${remoteRev}" ]]; then
         echob "    Checked $name SVN, 'No updates were found...'"
         return 0
@@ -332,13 +366,12 @@ autoBuild(){
 
 # makes pkg if Built OR builds THEN makes pkg
 function makePKG(){
-    versionToBuild=""
-    cloverUpdate="No"
-    clear;echo
+    echo
     echob "********************************************"
-    echob "*             Good $hours               *"
-    echob "*      Welcome To CloverGrower V$myV       *"
-    echob "*       This script by STLVNUB/JrCs        *"
+    echob "*              Good $hours              *"
+    echob "*     Welcome To CloverGrowerPro v$CloverGrowerVersion      *"
+    echob "*           This script by JrCs            *"
+    echob "*        Original script by STLVNUB        *"
     echob "* Clover Credits: Slice, dmazar and others *"
     echob "********************************************"
     echo
@@ -346,52 +379,56 @@ function makePKG(){
     echo
     echob "Work Folder: $WORKDIR"
     echob "Available  : ${workSpaceAvail} MB"
-    local cloverRemoteRev=$(getSvnRevision "$CLOVERSVNURL")
-    versionToBuild=$cloverRemoteRev
-    if [ -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ] && [ -d "${CloverDIR}" ] && [ "$target" != "X64" ]; then # don't build IF pkg already here
-        if [ -f "${builtPKGDIR}/${versionToBuild}"/CloverCD/EFI/BOOT/BOOTX64.efi ]; then
-            theBuiltVersion=$(strings "${builtPKGDIR}/${versionToBuild}/CloverCD/EFI/BOOT/BOOTX64.efi" | sed -n 's/^Clover revision: *//p')
-            if [ "${theBuiltVersion}" == "${versionToBuild}" ]; then
-                built="Yes"
-            else
-                built="No "
-                cloverUpdate="Yes"
-            fi
-            local cloverLocalRev=$(getSvnRevision "${CloverDIR}")
+    echo
+
+    CLOVER_REMOTE_REV=$(getSvnRevision "$CLOVERSVNURL")
+    versionToBuild=$CLOVER_REMOTE_REV
+    cloverUpdate="No"
+
+    if [[ -d "${CloverDIR}" ]]; then
+        CLOVER_LOCAL_REV=$(getSvnRevision "${CloverDIR}")
+        if [[ "${CLOVER_LOCAL_REV}" -ne "${versionToBuild}" ]]; then
+            echob "Clover Update Detected !"
             echob  "******** Clover Package STATS **********"
-            echob "$(printf '*       local  revision at %-12s*\n' $cloverLocalRev)"
-            echob "$(printf '*       remote revision at %-12s*\n' $cloverRemoteRev)"
+            echob "$(printf '*       local  revision at %-12s*\n' $CLOVER_LOCAL_REV)"
+            echob "$(printf '*       remote revision at %-12s*\n' $CLOVER_REMOTE_REV)"
             echob "$(printf '*       Package Built   =  %-12s*\n' $built)"
             echob "****************************************"
-            if [ "$built" == "Yes" ]; then
-                echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made!!"
-                return
-            fi
+            cloverUpdate="Yes"
+        else
+            echob "No Clover Update found. Current revision: ${CLOVER_LOCAL_REV}"
         fi
+    else
+        CLOVER_LOCAL_REV=0
+        cloverUpdate="Yes"
     fi
 
-    echo
-    if [[ ! -d "${CloverDIR}" ]]; then
-        cloverUpdate="Yes"
-    else
-        local cloverLocalRev=$(getSvnRevision "${CloverDIR}")
-        if [[ "${cloverLocalRev}" != "${versionToBuild}" ]]; then
-            echob "Clover Update Detected !"
-            cloverUpdate="Yes"
-            echob  "******** Clover Package STATS **********"
-            echob "$(printf '*       local  revision at %-12s*\n' $cloverLocalRev)"
-            echob "$(printf '*       remote revision at %-12s*\n' $cloverRemoteRev)"
-            echob "$(printf '*       Package Built   =  %-12s*\n' $built)"
-            echob "****************************************"
-        else
-            echob "No Clover Update found. Current revision: ${cloverLocalRev}"
-        fi
-    fi
+    # if [ -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ] && [ -d "${CloverDIR}" ] && [ "$target" != "X64" ]; then # don't build IF pkg already here
+    #     if [ -f "${builtPKGDIR}/${versionToBuild}"/CloverCD/EFI/BOOT/BOOTX64.efi ]; then
+    #         theBuiltVersion=$(strings "${builtPKGDIR}/${versionToBuild}/CloverCD/EFI/BOOT/BOOTX64.efi" | sed -n 's/^Clover revision: *//p')
+    #         if [ "${theBuiltVersion}" == "${versionToBuild}" ]; then
+    #             built="Yes"
+    #         else
+    #             built="No "
+    #             cloverUpdate="Yes"
+    #         fi
+    #         echob  "******** Clover Package STATS **********"
+    #         echob "$(printf '*       local  revision at %-12s*\n' $CLOVER_LOCAL_REV)"
+    #         echob "$(printf '*       remote revision at %-12s*\n' $CLOVER_REMOTE_REV)"
+    #         echob "$(printf '*       Package Built   =  %-12s*\n' $built)"
+    #         echob "****************************************"
+    #         if [ "$built" == "Yes" ]; then
+    #             echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made!!"
+    #             return
+    #         fi
+    #     fi
+    # fi
 
     echo
     if [[ "${cloverUpdate}" == "Yes" ]]; then
         echob "Getting SVN Source, Hang ten…"
         getSOURCE
+        CLOVER_LOCAL_REV=$(getSvnRevision "${CloverDIR}") # Update
     fi
 
     if [[ "$cloverUpdate" == "Yes" || ! -f "${EDK2DIR}/Conf/tools_def.txt" ]]; then
@@ -419,13 +456,14 @@ function makePKG(){
     fi
 
     if [[ "$buildClover" -eq 1 ]]; then
-        echob "Ready to build Clover $versionToBuild, Using Gcc $gccVersToUse"
+        echob "Ready to build Clover $CLOVER_LOCAL_REV, Using Gcc $gccVersToUse"
         autoBuild "$1"
     fi
 
-	if [ "$target" == "X64/IA32" ]; then
-		if [ ! -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ]; then # make pkg if not there
-			echob "Type 'm' To make Clover_v2_rL${versionToBuild}.pkg..."
+	if [ "$MAKE_PACKAGE" -eq 1 ]; then
+		local package_name="Clover_v2_r${versionToBuild}.pkg"
+		if [[ ! -f "${builtPKGDIR}/${versionToBuild}/$package_name" ]]; then # make pkg if not there
+			echob "Type 'm' To make ${package_name}..."
 			read choose
 			case $choose in
 			m|M)
@@ -460,10 +498,10 @@ function makePKG(){
 			*)
 			esac
 		else
-			echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made !"
+			echob "$package_name ALREADY Made !"
 		fi
 	else
-        echob "Skipping pkg creation, 64bit Build Only"
+        echob "Skipping pkg creation,"
         open "${cloverPKGDIR}"/CloverV2/
 	fi
 }

@@ -4,7 +4,10 @@
 *~
 
 # Local configuration file
-CloverGrower.conf
+/CloverGrower.conf
+
+# Auto generated files
+/.last_check
 
 # Directories that we doesn't need to track
 builtPKG/

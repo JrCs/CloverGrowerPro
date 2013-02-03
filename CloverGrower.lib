@@ -152,7 +152,7 @@ function update_repository() {
     local repotype="$2"
     case "$repotype" in
         svn)
-             (cd "$localdir" && svn up --parents >/dev/null)
+             (cd "$localdir" && svn up >/dev/null)
              ;;
         git)
              (cd "$localdir" && update_git_svn_repository)

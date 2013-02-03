@@ -29,6 +29,22 @@ CLOVER_REMOTE_REV=
 CLOVER_LOCAL_REV=
 
 function checkConfig() {
+    if [[ -z "$CHECKUPDATEINTERVAL" ]];then
+        local updateInterval
+        local msg=$(printf "Check for CloverGrowerPro update every %say/%seek/%sonth/%sever" \
+                    $(echob "D") $(echob "W") $(echob "M") $(echob "N"))
+        while [[ -z "$CHECKUPDATEINTERVAL" ]]; do
+            CHECKUPDATEINTERVAL=$(prompt "$msg" "W")
+            case "$CHECKUPDATEINTERVAL" in
+                [Nn]) CHECKUPDATEINTERVAL=-1       ;;
+                [Dd]) CHECKUPDATEINTERVAL=86400    ;;
+                [Ww]) CHECKUPDATEINTERVAL=604800   ;;
+                [Mm]) CHECKUPDATEINTERVAL=18446400 ;;
+                *)    CHECKUPDATEINTERVAL= ;;
+            esac
+        done
+        storeConfig 'CHECKUPDATEINTERVAL' "$CHECKUPDATEINTERVAL"
+    fi
     if [[ -z "$TOOLCHAIN" ]];then
         echo "Where to put the toolchain directory ?"
         TOOLCHAIN=$(prompt "TOOCHAIN directory" "$CLOVER_GROWER_DIR/toolchain")
@@ -52,18 +68,30 @@ function checkConfig() {
         fi
         storeConfig 'CLOVERSVNURL' "$CLOVERSVNURL"
     fi
-	if [[ -z "$CLOVERLOCALREPO" ]];then
-		local repotype=$(prompt "Do you want svn or git local clover repository" "svn")
-		if [[ $(lc "$repotype") == g* ]];then
-			CLOVERLOCALREPO='git'
-		else
-			CLOVERLOCALREPO='svn'
-		fi
-		storeConfig 'CLOVERLOCALREPO' "$CLOVERLOCALREPO"
-	fi
+    if [[ -z "$CLOVERLOCALREPO" ]];then
+        local repotype=$(prompt "Do you want svn or git local clover repository" "svn")
+        if [[ $(lc "$repotype") == g* ]];then
+            CLOVERLOCALREPO='git'
+        else
+            CLOVERLOCALREPO='svn'
+        fi
+        storeConfig 'CLOVERLOCALREPO' "$CLOVERLOCALREPO"
+    fi
+}
+
+function checkUpdate() {
+    local check_timestamp_file="$CLOVER_GROWER_DIR/.last_check"
+    local last_check=$(cat "$check_timestamp_file" 2>/dev/null)
+    local now=$(date '+%s')
+    if [[ $(( ${last_check:-0} + $CHECKUPDATEINTERVAL )) -lt $now ]]; then
+        echo "Checking for new version of CloverGrowerPro..."
+        git pull -f || exit 1
+        echo "$now" > "$check_timestamp_file"
+    fi
 }
 
 checkConfig
+checkUpdate
 
 # don't use -e
 set -u
@@ -330,7 +358,7 @@ autoBuild(){
 
 # makes pkg if Built OR builds THEN makes pkg
 function makePKG(){
-    clear;echo
+    echo
     echob "********************************************"
     echob "*              Good $hours              *"
     echob "*     Welcome To CloverGrowerPro v$CloverGrowerVersion      *"

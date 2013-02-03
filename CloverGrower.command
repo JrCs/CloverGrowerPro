@@ -425,8 +425,9 @@ function makePKG(){
     fi
 
 	if [ "$MAKE_PACKAGE" -eq 1 ]; then
-		if [ ! -f "${builtPKGDIR}/${versionToBuild}/Clover_v2_rL${versionToBuild}".pkg ]; then # make pkg if not there
-			echob "Type 'm' To make Clover_v2_rL${versionToBuild}.pkg..."
+		local package_name="Clover_v2_r${versionToBuild}.pkg"
+		if [[ ! -f "${builtPKGDIR}/${versionToBuild}/$package_name" ]]; then # make pkg if not there
+			echob "Type 'm' To make ${package_name}..."
 			read choose
 			case $choose in
 			m|M)
@@ -461,7 +462,7 @@ function makePKG(){
 			*)
 			esac
 		else
-			echob "Clover_v2_rL${versionToBuild}.pkg ALREADY Made !"
+			echob "$package_name ALREADY Made !"
 		fi
 	else
         echob "Skipping pkg creation,"

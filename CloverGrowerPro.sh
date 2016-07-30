@@ -655,7 +655,7 @@ function makePKG(){
     fi
 
     # Construct EBUILD_COMMAND
-    EBUILD_COMMAND=("./ebuild.sh" "-${ebuildToolchainFlag}" "-$style")
+    EBUILD_COMMAND=("./ebuild.sh" "-${ebuildToolchainFlag}")
 
     # We can activate VBios Patch in CloverEFI since revision 1162 of Clover
     [[ "$VBIOS_PATCH_IN_CLOVEREFI" -ne 0 && "$versionToBuild" -ge 1162 ]] && \
